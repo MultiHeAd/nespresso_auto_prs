@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from pptx.util import Pt
 from pptx.enum.text import PP_PARAGRAPH_ALIGNMENT
+import os
+
 def get_dt_year_month():
     dt = datetime.datetime.now()
     year, month = dt.year, dt.month - 1
@@ -758,7 +760,6 @@ def format_arrow_wb(prs, fdata, i, j, sheet_name, usecols, skiprows, nrows, sep=
 
 def rps_format(prs, fdata):
 
-
     format_rpt_title(prs, 0, 0)
 
     format_text_text(prs, 3, 9, '销售金额')
@@ -830,8 +831,8 @@ def rps_format(prs, fdata):
     format_arrow(prs, 5, 10, 5, 11)
     format_arrow_reverse(prs, 5, 12, 5, 8)
     format_arrow_reverse(prs, 5, 13, 5, 11)
-    format_table_data(prs, prs_data_load, 5, 14, 'calculation', 1, 3, 'A', 'C')
-    format_table_data(prs, prs_data_load, 5, 15, 'calculation', 1, 3, 'E', 'G')
+    format_table_data(prs, fdata, 5, 14, 'calculation', 1, 3, 'A', 'C')
+    format_table_data(prs, fdata, 5, 15, 'calculation', 1, 3, 'E', 'G')
     format_remark_text(prs, 5, 2, '生意参谋')
 
     format_chart_data2(prs, fdata, 6, 4, 'dat_nespresso_shop_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '')
@@ -874,9 +875,9 @@ def rps_format(prs, fdata):
     format_arrow(prs, 11, 36, 11, 39)
     format_remark_text(prs, 11, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
-    format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_top1品牌_占比', '销售金额_top2品牌_占比', '销售金额_top3品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_top品牌_其他商家_占比'], 1,'咖啡机')
+    format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_Top1品牌_占比', '销售金额_Top2品牌_占比', '销售金额_Top3品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_Top品牌_其他商家_占比'], 1,'咖啡机')
     format_chart_data6(prs, fdata, 12, 14, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额'], ['交易金额_万'], 10, '咖啡机')
-    format_table_data_brand_mkt_share(prs, fdata,12, 4, 'dat_nespresso_mkt_overview', ['时间范围'], ['时间范围', '销售金额_top3品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '咖啡机')
+    format_table_data_brand_mkt_share(prs, fdata,12, 4, 'dat_nespresso_mkt_share', ['时间范围'], ['时间范围', '销售金额_top3品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '咖啡机')
     format_table_data_brand(prs, fdata,12, 7, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额_同比', '品牌市占率', '品牌市占率_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 10, '咖啡机')
     #format_table_data_brand_mkt(prs, fdata,12, 7, 'dat_nespresso_mkt_overview', ['时间范围'], ['销售金额_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 1, '咖啡机')
     format_table_data_brand_rk(prs, fdata,12, 18, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '咖啡机')
@@ -1130,8 +1131,8 @@ def rps_format(prs, fdata):
     format_remark_text(prs, 37, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
     format_chart_data6(prs, fdata, 38, 7, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额'], ['交易金额_万'], 10, '胶囊咖啡')
-    format_chart_data3(prs, fdata, 38, 10, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_top1品牌_占比', '销售金额_top2品牌_占比', '销售金额_top3品牌_占比',  '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_top品牌_其他商家_占比'], 1, '胶囊咖啡')
-    format_table_data_brand_mkt_share(prs, fdata, 38, 3, 'dat_nespresso_mkt_overview', ['时间范围'], ['时间范围', '销售金额_top2品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '胶囊咖啡')
+    format_chart_data3(prs, fdata, 38, 10, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_Top1品牌_占比', '销售金额_Top2品牌_占比', '销售金额_Top3品牌_占比',  '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_Top品牌_其他商家_占比'], 1, '胶囊咖啡')
+    format_table_data_brand_mkt_share(prs, fdata, 38, 3, 'dat_nespresso_mkt_share', ['时间范围'], ['时间范围', '销售金额_top2品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '胶囊咖啡')
     format_table_data_brand(prs, fdata, 38, 6, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额_同比', '品牌市占率', '品牌市占率_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 10, '胶囊咖啡')
     #format_table_data_brand_mkt(prs, fdata, 38, 6, 'dat_nespresso_mkt_overview', ['时间范围'], ['销售金额_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 1, '胶囊咖啡')
     format_table_data_brand_rk(prs, fdata, 38, 13, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '胶囊咖啡')
@@ -1288,8 +1289,9 @@ def run(prs_data_load, prs_load, prs_output):
 
 
 if __name__ == '__main__':
-    prs_data_load = r'C:\Users\Yinfinity\Desktop\nespresso_auto_prs\data\nespresso_rpt_data_202401.xlsx'
-    prs_load = r'C:\Users\Yinfinity\Desktop\nespresso_auto_prs\data\nespresso_rpt_demo.pptx'
-    prs_output = r'C:\Users\Yinfinity\Desktop\nespresso_auto_prs\data\nespresso_rpt_ini_202401.pptx'
+    project_folder=os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    prs_data_load = os.path.join(project_folder,'./data/nespresso_rpt_data_202401.xlsx')
+    prs_load = os.path.join(project_folder,'./data/nespresso_rpt_demo.pptx')
+    prs_output = os.path.join(project_folder,'./data/nespresso_rpt_ini_202401.pptx')
 
     run(prs_data_load, prs_load, prs_output)
