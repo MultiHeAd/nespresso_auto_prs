@@ -50,7 +50,7 @@ def format_table_data(prs, fdata, slide_number, table_index, sheet_name, start_r
     color_df = df.applymap(lambda x: RGBColor(73, 113, 30) if isinstance(x, (int, float)) and x > 0 else RGBColor(192,0,0))
 
     df = df.applymap(lambda x: f"{int(x * 100)}%" if isinstance(x, (int, float)) else x)
-    print("读取到的 DataFrame:\n", df)
+    #print("读取到的 DataFrame:\n", df)
 
     slide = prs.slides[slide_number - 1]
     table = slide.shapes[table_index].table
@@ -181,6 +181,37 @@ def get_tbl_data_chl_1st(fdata, table_name, col_c, col_s, chl='', ct='', shop=''
         dfseries = df[col_s].fillna(0).reset_index(drop=True)
     return dfcategories, dfseries
 
+def get_tbl_data_chl_sort(fdata, table_name, col_c, col_s, chl='', ct='', shop=''):
+    df = pd.read_excel(fdata, sheet_name=table_name)
+    if ct != '':
+        df = df[df['类目']==ct].reset_index(drop=True)
+    else:
+        df = df
+    if shop != '':
+        df = df[df['店铺']==shop].reset_index(drop=True)
+    else:
+        df = df
+    if chl == '广告流量':
+        df = df[df['一级']==chl].reset_index(drop=True)
+        df = df[df['三级']!='汇总'].sort_values(by=['rk_ad']).reset_index(drop=True)
+
+        df=df.groupby('二级',sort=False,as_index=False).apply(lambda x: x.sort_values('访客数_本月', ascending=False)).reset_index(drop=True)
+
+        dfcategories = df[col_c].fillna('').reset_index(drop=True)
+        if '二级' in dfcategories.columns:
+            dfcategories['二级'].mask(dfcategories['二级'].shift(1) == dfcategories['二级'], inplace=True)
+            dfcategories = dfcategories.fillna('')
+        else:
+            dfcategories = dfcategories
+        dfseries = df[col_s].fillna(0).reset_index(drop=True)
+    elif chl == '平台流量':
+        df = df[df['一级']==chl].reset_index(drop=True)
+        df = df[df['三级']=='汇总'].reset_index(drop=True)
+        df = df[df['二级']!='汇总'].sort_values(by=['rk_uv']).reset_index(drop=True)
+        dfcategories = df[col_c][:7].fillna('').reset_index(drop=True)
+        dfseries = df[col_s][:7].fillna(0).reset_index(drop=True)
+    return dfcategories, dfseries
+
 def replace_chart_data(chart, dfcategories, dfseries):
     chart_data = CategoryChartData()
     if len(dfcategories.keys()) > 1:
@@ -240,6 +271,12 @@ def format_chart_data2(prs, fdata, i, j, table_name, col_c, col_s, chl='', ct=''
     replace_chart_data(chart, dfcategories, dfseries)
     print(f'format_chart_data2--{i}--{j}')
 
+def format_chart_data_sort(prs, fdata, i, j, table_name, col_c, col_s, chl='', ct='', shop=''):
+    chart = prs.slides[i].shapes[j].chart
+    dfcategories, dfseries = get_tbl_data_chl_sort(fdata, table_name, col_c, col_s, chl, ct, shop)
+    replace_chart_data(chart, dfcategories, dfseries)
+    print(f'format_chart_data2--{i}--{j}')
+
 def format_chart_data_chl(prs, fdata, i, j, table_name, col_c, col_s, chl='', ct='', shop=''):
     chart = prs.slides[i].shapes[j].chart
     dfcategories1, dfseries1 = get_tbl_data_chl_1st(fdata, table_name, col_c, col_s, chl[0], ct, shop)
@@ -261,6 +298,7 @@ def get_tbl_data_trans(fdata, table_name, col, col_s, nrows, ct=''):
     df_trans = df[col_s][-nrows:].T.reset_index() if nrows == 1 else df[col_s][-nrows:1-nrows].T.reset_index()
     df_trans.columns = ['tag', col]
     dfcategories = df_trans[['tag']].replace(f"{col}", "", regex=True).replace("占比", "", regex=True).replace("top品牌", "", regex=True).replace("品牌", "", regex=True).replace("_", "", regex=True).replace("nd", "", regex=True).replace("rd", "", regex=True)
+    dfcategories['tag']=dfcategories['tag'].str.upper()
     dfseries = df_trans[[col]].fillna(0)
     return dfcategories, dfseries
 
@@ -348,6 +386,8 @@ def format_chart_data6(prs, fdata, i, j, table_name, col_c, col_s, col_l, nrows,
 def data_val_format(data_val, data_key):
     if data_val == 0:
         data_val_fin = '持平' if data_key=='排名_变化' else '-'
+    elif data_key=='排名_变化':
+        data_val_fin= "{:+.0f}".format(data_val)
     elif data_key in ['*首图']:
         data_val_fin = ""
     elif data_val in ['<2000', '-'] or data_key in ['一级类目购买偏好', 'TGI', '叶子类目Top1', '叶子类目Top1 (按TGI)', '偏好购买品牌Top 5（按TGI排序）', '购买率(本品vs.竞品)', '本品竞争力', '购买率\n(本品vs.竞品)', 'lbl', 'TOP 单品（SPU）', '咖啡机类型', 'TOP5单品', '型号系列', 'TOP10单品', '品牌', '搜索词']:
@@ -450,9 +490,31 @@ def format_table_data_chl(prs, fdata, i, j, table_name, col_c, col_s, chl, ct=''
                 data_key = dfseries.iloc[:, ii].name
                 data_val = dfseries.iloc[jj - 3, ii]
             data_val_fin = data_val_format(data_val, data_key)
-            print(data_key, data_val, data_val_fin)
+            #print(data_key, data_val, data_val_fin)
+            format_table_cell(cell, data_key, data_val_fin, ct)
+            
+    print(f'format_table_data_chl--{i}--{j}')
+
+def format_table_data_chl_sort(prs, fdata, i, j, table_name, col_c, col_s, chl, ct='', shop=''):
+    table = prs.slides[i].shapes[j].table
+    dfcategories, dfseries = get_tbl_data_chl_sort(fdata, table_name, col_c, col_s, chl, ct, shop)
+    dfcategories_1st, dfseries_1st = get_tbl_data_chl_1st(fdata, table_name, col_c, col_s, chl, ct)
+    #print(dfcategories,dfseries)
+    col_no_pay=dfcategories['chl'][dfseries['支付人数_同比']==0].map(lambda x:x.split('-')[-1]).tolist()
+    for ii, row in enumerate(table.rows):
+        for jj, cell in enumerate(row.cells):
+            if jj<=1:continue
+            elif jj == 2:
+                data_key = dfseries_1st.iloc[:, ii].name
+                data_val = dfseries_1st.iloc[jj - 3, ii]
+            else:
+                data_key = dfseries.iloc[:, ii].name
+                data_val = dfseries.iloc[jj - 3, ii]
+            data_val_fin = data_val_format(data_val, data_key)
+            #print(data_key, data_val, data_val_fin)
             format_table_cell(cell, data_key, data_val_fin, ct)
     print(f'format_table_data_chl--{i}--{j}')
+    return col_no_pay
 
 def format_table_data_brand(prs, fdata, i, j, table_name, col_c, col_s, nrows, ct):
     table = prs.slides[i].shapes[j].table
@@ -835,9 +897,9 @@ def rps_format(prs, fdata):
     format_table_data(prs, fdata, 5, 15, 'calculation', 1, 3, 'E', 'G')
     format_remark_text(prs, 5, 2, '生意参谋')
 
-    format_chart_data2(prs, fdata, 6, 4, 'dat_nespresso_shop_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '')
-    format_table_data_chl(prs, fdata, 6, 3, 'dat_nespresso_shop_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '')
-    format_remark_text(prs, 6, 2, '生意参谋', '生意参谋暂不支持查看UD投放效果、流量宝、超级短视频、超级直播渠道的后链路转化表现')
+    format_chart_data_sort(prs, fdata, 6, 4, 'dat_nespresso_shop_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '')
+    col_no_pay=format_table_data_chl_sort(prs, fdata, 6, 3, 'dat_nespresso_shop_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '')
+    format_remark_text(prs, 6, 2, '生意参谋', '生意参谋暂不支持查看{}渠道的后链路转化表现'.format('、'.join(col_no_pay)))
 
     format_chart_data2(prs, fdata, 7, 3, 'dat_nespresso_shop_chl', ['二级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '平台流量', '')
     format_table_data_chl(prs, fdata, 7, 4, 'dat_nespresso_shop_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '平台流量', '')
@@ -875,12 +937,12 @@ def rps_format(prs, fdata):
     format_arrow(prs, 11, 36, 11, 39)
     format_remark_text(prs, 11, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
-    format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_Top1品牌_占比', '销售金额_Top2品牌_占比', '销售金额_Top3品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_Top品牌_其他商家_占比'], 1,'咖啡机')
+    format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_share', '销售金额', ['销售金额_top1品牌_占比', '销售金额_top2nd品牌_占比', '销售金额_top3rd品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_top品牌_其他商家_占比'], 1,'咖啡机')
     format_chart_data6(prs, fdata, 12, 14, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额'], ['交易金额_万'], 10, '咖啡机')
     format_table_data_brand_mkt_share(prs, fdata,12, 4, 'dat_nespresso_mkt_share', ['时间范围'], ['时间范围', '销售金额_top3品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '咖啡机')
     format_table_data_brand(prs, fdata,12, 7, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额_同比', '品牌市占率', '品牌市占率_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 10, '咖啡机')
     #format_table_data_brand_mkt(prs, fdata,12, 7, 'dat_nespresso_mkt_overview', ['时间范围'], ['销售金额_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 1, '咖啡机')
-    format_table_data_brand_rk(prs, fdata,12, 18, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '咖啡机')
+    format_table_data_brand_rk(prs, fdata,12, 15, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '咖啡机')
     format_text_data(prs, fdata, 12, 9, 'dat_nespresso_mkt_rk_brand', 'TTL*', 1, '咖啡机')
     format_remark_text(prs, 12, 2, '生意参谋；渠道：全渠道','市场TTL：当月市场Top50品牌GMV加总；*市占率 = 品牌GMV/ 当月Top50品牌GMV加总')
 
@@ -949,7 +1011,7 @@ def rps_format(prs, fdata):
     format_arrow_wb(prs, fdata, 20, 16, '咖啡机表现', 'E:F', 228, 2, 1)
     format_arrow_wb(prs, fdata, 20, 17, '咖啡机表现', 'E:F', 229, 2, 1)
     format_arrow_wb(prs, fdata, 20, 18, '咖啡机表现', 'E:F', 230, 2, 1)
-    format_arrow_wb(prs, fdata, 20, 18, '咖啡机表现', 'E:F', 231, 2, 1)
+    format_arrow_wb(prs, fdata, 20, 19, '咖啡机表现', 'E:F', 231, 2, 1)
     format_arrow_wb(prs, fdata, 20, 20, '咖啡机表现', 'E:F', 232, 2, 1)
     format_arrow_wb(prs, fdata, 20, 21, '咖啡机表现', 'E:F', 233, 2, 1)
     format_arrow_wb(prs, fdata, 20, 22, '咖啡机表现', 'E:F', 234, 2, 1)
@@ -974,7 +1036,7 @@ def rps_format(prs, fdata):
     format_text_data_wb(prs, fdata, 22, 26, '咖啡机表现', 'E:F', 270, 2, 'ratio')
     format_text_data_wb(prs, fdata, 22, 27, '咖啡机表现', 'E:F', 271, 2, 'ratio')
     format_text_data_wb(prs, fdata, 22, 28, '咖啡机表现', 'E:F', 272, 2, 'ratio')
-    format_remark_text(prs, 22, 2, '生意参谋')
+    format_remark_text(prs, 22, 2, '生意参谋','本月进入Top100榜单的胶囊咖啡机产品中心想胶囊咖啡机及小牛妈妈品质生活馆售卖的Nespresso Inissia均有刷单嫌疑\n*2023年10-12月由于生意参谋市场大盘值无法转化为真实值，用市场Top50品牌GMV加总代替，即：占比 = 当月Top300中胶囊咖啡机交易金额 / 当月Top50品牌GMV加总')
 
     format_table_data_wb(prs, fdata, 23, 3, '咖啡机表现', 'H:N', 305, 11, 1, 0)
     format_table_data_wb(prs, fdata, 23, 4, '咖啡机表现', 'A:G', 305, 11, 1, 0)
@@ -996,9 +1058,9 @@ def rps_format(prs, fdata):
     format_text_data_wb(prs, fdata, 24, 13, '咖啡机表现', 'E:F', 331, 2, 'TOP5GMV')
     format_remark_text(prs, 24, 2, '生意参谋')
 
-    format_chart_data2(prs, fdata, 26, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '咖啡机')
-    format_table_data_chl(prs, fdata, 26, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '咖啡机')
-    format_remark_text(prs, 26, 2, '生意参谋', '生意参谋暂不支持查看UD效果投放、超级短视频渠道的后链路转化表现')
+    format_chart_data_sort(prs, fdata, 26, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '咖啡机')
+    col_no_pay=format_table_data_chl_sort(prs, fdata, 26, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '咖啡机')
+    format_remark_text(prs, 26, 2, '生意参谋',  '生意参谋暂不支持查看{}渠道的后链路转化表现'.format('、'.join(col_no_pay)))
 
     format_chart_data2(prs, fdata, 27, 3, 'dat_nespresso_shop_ct_chl', ['二级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '平台流量', '咖啡机')
     format_table_data_chl(prs, fdata, 27, 4, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '平台流量', '咖啡机')
@@ -1227,9 +1289,9 @@ def rps_format(prs, fdata):
     format_arrow_wb(prs, fdata, 49, 18, '咖啡市场情况', 'I:J', 323, 2, 1)
     format_remark_text(prs, 49, 2, '生意参谋')
 
-    format_chart_data2(prs, fdata, 51, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '胶囊咖啡')
-    format_table_data_chl(prs, fdata, 51, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '胶囊咖啡')
-    format_remark_text(prs, 51, 2, '生意参谋', '生意参谋暂不支持查看超级直播渠道的后链路转化表现')
+    format_chart_data_sort(prs, fdata, 51, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '胶囊咖啡')
+    col_no_pay=format_table_data_chl_sort(prs, fdata, 51, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '胶囊咖啡')
+    format_remark_text(prs, 51, 2, '生意参谋', '生意参谋暂不支持查看{}渠道的后链路转化表现'.format('、'.join(col_no_pay)))
 
     format_chart_data2(prs, fdata, 52, 3, 'dat_nespresso_shop_ct_chl', ['二级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '平台流量', '胶囊咖啡')
     format_table_data_chl(prs, fdata, 52, 4, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '平台流量', '胶囊咖啡')
