@@ -13,7 +13,11 @@ import os
 def test_page(prs_data_load, prs_load, test_output):
     fdata = prs_data_load
     prs = Presentation(prs_load)
-    format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_Top1品牌_占比', '销售金额_Top2品牌_占比', '销售金额_Top3品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_Top品牌_其他商家_占比'], 1,'咖啡机')
+
+    format_chart_data_sort(prs, fdata, 26, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '咖啡机')
+    col_no_pay=format_table_data_chl_sort(prs, fdata, 26, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '咖啡机')
+    format_remark_text(prs, 26, 2, '生意参谋',  '生意参谋暂不支持查看{}渠道的后链路转化表现'.format('、'.join(col_no_pay)))
+
     prs.save(test_output)
 
 if __name__ == '__main__':
