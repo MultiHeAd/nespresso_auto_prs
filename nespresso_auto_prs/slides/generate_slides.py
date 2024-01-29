@@ -4,6 +4,7 @@ from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
 import datetime
+from dateutil.relativedelta import relativedelta
 import pandas as pd
 import numpy as np
 from pptx.util import Pt
@@ -33,6 +34,12 @@ def get_dt_yearNmonth():
         month = 12
         year -= 1
     return year, month
+
+def get_dt_xinlaoke():
+    dt_now=datetime.datetime.now()-relativedelta(months=1)
+    dt_xinke=dt_now-relativedelta(months=1)
+    dt_last_xinke=dt_xinke-relativedelta(months=11)
+    return dt_now.strftime('%y.%m'),dt_xinke.strftime('%y.%m'),dt_last_xinke.strftime('%y.%m')
 
 def format_rpt_title(prs, i, j):
     shape = prs.slides[i].shapes[j]
@@ -397,7 +404,7 @@ def data_val_format(data_val, data_key):
             data_val_fin = data_val.replace('-', '.')
         elif data_key in ['chl']:
             data_val_fin = data_val.replace('品销宝- ', '')
-        elif data_key in ['支付转化率_同比']:
+        elif data_key in ['支付转化率_同比','品牌市占率_同比']:
             data_val_fin = "{:+.0f}pp".format(data_val * 100) if abs(data_val) >= 0.02 else "{:+.1f}pp".format(data_val * 100)
         elif data_key in ['品牌市占率', '支付转化率', '增速'] or '占比' in data_key:
             if data_val > 9.99:
@@ -787,6 +794,34 @@ def format_text_data_wb(prs, fdata, i, j, sheet_name, usecols, skiprows, nrows, 
     shape.text_frame.paragraphs[0].runs[0].text = f"{data_val_fin}"
     print(f'format_text_data_wb--{i}--{j}--{shape.text}')
 
+def format_table_data_sub(prs, fdata, i, j, sheet_name, usecols, skiprows, nrows):
+    table = prs.slides[i].shapes[j].table
+    dfcategories, dfseries = get_tbl_data_wb(fdata, sheet_name, usecols, skiprows, nrows)
+    dfseries['sub']=(dfseries.iloc[:,-1]-dfseries.iloc[:,-2])*100
+    for ii, row in enumerate(table.rows):
+        if ii <len(dfseries['sub']):
+            data_key = '控盘率_变化'
+            data_val = dfseries['sub'][ii]
+            # print(data_key, data_val)
+            # print(data_key, data_val, data_val_fin)
+            cell = table.cell(ii+2, 1)
+            if not cell.text_frame.paragraphs:
+                cell.text_frame.add_paragraph()
+            paragraph = cell.text_frame.paragraphs[0]
+            if not paragraph.runs:
+                paragraph.add_run()
+            run = paragraph.runs[0]
+            if data_val>0:
+                data_val_fin = "{:+.0f}pp".format(data_val)
+                run.font.color.rgb = RGBColor(73, 113, 30)
+            elif data_val==0:
+                data_val_fin="-"
+            else:
+                data_val_fin = "{:.0f}pp".format(data_val)
+                run.font.color.rgb = RGBColor(192, 0, 0)
+            run.text = data_val_fin
+            
+
 def format_table_cell_color(prs, i, j, cell_is, cell_js, lbl):
     table = prs.slides[i].shapes[j].table
     for cell_i in cell_is:
@@ -804,6 +839,11 @@ def format_table_cell_color(prs, i, j, cell_is, cell_js, lbl):
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = RGBColor(255, 231, 231) if '-' in data_val else RGBColor(219, 240, 197)
                 print(f'format_table_cell_color--{i}--{j}--{cell.fill.fore_color.rgb}')
+            elif data_val != '-' and lbl == '品牌分销背景':
+                if '-' not in data_val:
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = RGBColor(219, 240, 197)
+                    print(f'format_table_cell_color--{i}--{j}--{cell.fill.fore_color.rgb}')
             elif lbl == '咖啡机类型':
                 cell.text_frame.paragraphs[0].runs[0].font.color.rgb = RGBColor(141, 121, 99) if '半自动' in data_val else RGBColor(115, 70, 31) if '全自动' in data_val else RGBColor(213, 140, 45)
                 print(f'format_table_cell_color--{i}--{j}--{cell.text_frame.paragraphs[0].runs[0].font.color.rgb}')
@@ -885,16 +925,12 @@ def rps_format(prs, fdata):
     format_chart_data4(prs, fdata, 5, 3, 'dat_nespresso_shop_overview', ['时间范围'], ['支付金额_咖啡机', '支付金额_胶囊咖啡', '支付金额_其他咖啡', '支付金额_其他'], ['支付金额_咖啡机_占比', '支付金额_胶囊咖啡_占比', '支付金额_其他咖啡_占比',  '支付金额_其他_占比'], [2], [13, 1])
     format_chart_data4(prs, fdata, 5, 4, 'dat_nespresso_shop_overview', ['时间范围'], ['支付买家数_咖啡机', '支付买家数_胶囊咖啡', '支付买家数_其他咖啡'], ['支付买家数_咖啡机_占比', '支付买家数_胶囊咖啡_占比', '支付买家数_其他咖啡_占比'], [2], [13, 1])
     format_chart_data5(prs, fdata, 5, 5, 'dat_nespresso_shop_overview', '客单价', ['客单价', '客单价_咖啡机',  '客单价_胶囊咖啡'], [13, 1])
-    format_text_data(prs, fdata, 5, 8, 'dat_nespresso_shop_overview', '支付金额_胶囊咖啡_占比', [13, 1])
-    format_text_data(prs, fdata, 5, 11, 'dat_nespresso_shop_overview', '支付买家数_胶囊咖啡_占比', [13, 1])
-    format_text_data_color(prs, 5, 8)
-    format_text_data_color(prs, 5, 11)
-    format_arrow(prs, 5, 7, 5, 8)
-    format_arrow(prs, 5, 10, 5, 11)
-    format_arrow_reverse(prs, 5, 12, 5, 8)
-    format_arrow_reverse(prs, 5, 13, 5, 11)
-    format_table_data(prs, fdata, 5, 14, 'calculation', 1, 3, 'A', 'C')
-    format_table_data(prs, fdata, 5, 15, 'calculation', 1, 3, 'E', 'G')
+    format_text_data(prs, fdata, 5, 6, 'dat_nespresso_shop_overview', '支付金额_胶囊咖啡_占比', [13, 1])
+    format_text_data(prs, fdata, 5, 7, 'dat_nespresso_shop_overview', '支付买家数_胶囊咖啡_占比', [13, 1])
+    format_text_data_color(prs, 5, 6)
+    format_text_data_color(prs, 5, 7)
+    format_table_data(prs, fdata, 5, 8, 'calculation', 1, 3, 'A', 'C')
+    format_table_data(prs, fdata, 5, 9, 'calculation', 1, 3, 'E', 'G')
     format_remark_text(prs, 5, 2, '生意参谋')
 
     format_chart_data_sort(prs, fdata, 6, 4, 'dat_nespresso_shop_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '')
@@ -935,7 +971,7 @@ def rps_format(prs, fdata):
     format_arrow(prs, 11, 29, 11, 30)
     format_arrow(prs, 11, 32, 11, 33)
     format_arrow(prs, 11, 36, 11, 39)
-    format_remark_text(prs, 11, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
+    format_remark_text(prs, 11, 2, '策略中心；渠道：全渠道；(由于生意参谋平台限制，大盘数据无法转化为真实值，改用策略中心（大盘同比值均为真实值）数据)', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
     format_chart_data3(prs, fdata, 12, 3, 'dat_nespresso_mkt_share', '销售金额', ['销售金额_top1品牌_占比', '销售金额_top2nd品牌_占比', '销售金额_top3rd品牌_占比', '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_top品牌_其他商家_占比'], 1,'咖啡机')
     format_chart_data6(prs, fdata, 12, 14, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额'], ['交易金额_万'], 10, '咖啡机')
@@ -946,10 +982,12 @@ def rps_format(prs, fdata):
     format_text_data(prs, fdata, 12, 9, 'dat_nespresso_mkt_rk_brand', 'TTL*', 1, '咖啡机')
     format_remark_text(prs, 12, 2, '生意参谋；渠道：全渠道','市场TTL：当月市场Top50品牌GMV加总；*市占率 = 品牌GMV/ 当月Top50品牌GMV加总')
 
-    format_chart_data_wb(prs, fdata, 13, 4, '咖啡机表现', 'C:E', 69, 11)
+    format_chart_data_wb(prs, fdata, 13, 1, '咖啡机表现', 'C:E', 69, 11)
     format_table_data_wb(prs, fdata, 13, 5, '咖啡机表现', [0, 1, 2, 5, 6, 7], 69, 11, 1, -1)
+    format_table_data_sub(prs, fdata, 13, 0, '咖啡机表现', 'C:E', 69, 11)
     format_table_cell_color(prs, 13, 5, list(range(2, 12)), list(range(1, 4)), '品牌分销')
-    format_remark_text(prs, 13, 3, '生意参谋')
+    format_table_cell_color(prs, 13, 5, list(range(2, 12)), list(range(1, 4)), '品牌分销背景')
+    format_remark_text(prs, 13, 4, '生意参谋')
 
     format_chart_data(prs, fdata, 14, 6, 'dat_nespresso_shop_ct_each', ['时间范围'], ['支付金额'], 13, '咖啡机')
     format_text_text(prs, 14, 9, '销售金额')
@@ -988,7 +1026,7 @@ def rps_format(prs, fdata):
 
     format_chart_data(prs, fdata, 17, 3, 'dat_nespresso_profile_d', ['标签', '标签值'], ['店铺购买人群', '店铺品牌新客', '店铺品牌老客'], 19, '咖啡机')
     format_chart_title(prs, 17, 3, '咖啡机新老客购买人群画像')
-    format_remark_text(prs, 17, 2, '策略中心', '店铺咖啡机品牌新客-当月购买店铺咖啡机差前365天购买品牌产品；\n店铺咖啡机品牌老客-当月购买店铺咖啡机交前365天购买品牌产品')
+    format_remark_text(prs, 17, 2, '达摩盘', '店铺咖啡机品牌新客-当月购买店铺咖啡机差前365天购买品牌产品；\n店铺咖啡机品牌老客-当月购买店铺咖啡机交前365天购买品牌产品')
 
     format_chart_data_wb(prs, fdata, 18, 3, '咖啡机表现', 'B:C', 180, 11)
     format_table_data_wb(prs, fdata, 18, 4, '咖啡机表现', 'A:F', 180, 11, 1, 0)
@@ -1036,7 +1074,7 @@ def rps_format(prs, fdata):
     format_text_data_wb(prs, fdata, 22, 26, '咖啡机表现', 'E:F', 270, 2, 'ratio')
     format_text_data_wb(prs, fdata, 22, 27, '咖啡机表现', 'E:F', 271, 2, 'ratio')
     format_text_data_wb(prs, fdata, 22, 28, '咖啡机表现', 'E:F', 272, 2, 'ratio')
-    format_remark_text(prs, 22, 2, '生意参谋','本月进入Top100榜单的胶囊咖啡机产品中心想胶囊咖啡机及小牛妈妈品质生活馆售卖的Nespresso Inissia均有刷单嫌疑\n*2023年10-12月由于生意参谋市场大盘值无法转化为真实值，用市场Top50品牌GMV加总代替，即：占比 = 当月Top300中胶囊咖啡机交易金额 / 当月Top50品牌GMV加总')
+    format_remark_text(prs, 22, 2, '生意参谋','本月进入Top100榜单的胶囊咖啡机产品中心想胶囊咖啡机及小牛妈妈品质生活馆售卖的Nespresso Inissia均有刷单嫌疑\n*从2023年10月开始由于生意参谋市场大盘值无法转化为真实值，用市场Top50品牌GMV加总代替，即：占比 = 当月Top300中胶囊咖啡机交易金额 / 当月Top50品牌GMV加总')
 
     format_table_data_wb(prs, fdata, 23, 3, '咖啡机表现', 'H:N', 305, 11, 1, 0)
     format_table_data_wb(prs, fdata, 23, 4, '咖啡机表现', 'A:G', 305, 11, 1, 0)
@@ -1046,7 +1084,7 @@ def rps_format(prs, fdata):
     format_table_cell_color(prs, 23, 4, list(range(2, 12)), list(range(3, 6)), 'TOP单品')
     format_table_cell_color(prs, 23, 3, list(range(2, 12)), list(range(2, 3)), '咖啡机类型')
     format_table_cell_color(prs, 23, 4, list(range(2, 12)), list(range(2, 3)), '咖啡机类型')
-    format_remark_text(prs, 23, 2, '策略中心；渠道：全渠道','本月进入Top100榜单的胶囊咖啡机产品中心想胶囊咖啡机及小牛妈妈品质生活馆售卖的Nespresso Inissia均有刷单嫌疑\n*2023年10-12月由于生意参谋市场大盘值无法转化为真实值，用市场Top50品牌GMV加总代替，即：占比 = 当月Top300中胶囊咖啡机交易金额 / 当月Top50品牌GMV加总')
+    format_remark_text(prs, 23, 2, '策略中心；渠道：全渠道')
 
     format_table_data_wb(prs, fdata, 24, 3, '咖啡机表现', 'A:I', 321, 6, 0, 0)
     format_table_data_wb(prs, fdata, 24, 4, '咖啡机表现', 'Q:X', 321, 6, 0, 0)
@@ -1066,40 +1104,40 @@ def rps_format(prs, fdata):
     format_table_data_chl(prs, fdata, 27, 4, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '平台流量', '咖啡机')
     format_remark_text(prs, 27, 2, '生意参谋')
 
-    format_chart_data_chl(prs, fdata, 28, 3, 'dat_nespresso_compet_chl', ['店铺'], ['uv占比'], ['广告流量', '平台流量'], '咖啡机', ['格米莱旗舰店', 'Nespresso', 'delonghi德龙旗舰店', '柏翠旗舰店', 'barsetto电器旗舰店'])
+    format_chart_data_chl(prs, fdata, 28, 3, 'dat_nespresso_compet_chl', ['店铺'], ['uv占比'], ['广告流量', '平台流量'], '咖啡机', ['格米莱旗舰店', 'delonghi德龙旗舰店', 'barsetto电器旗舰店', 'Nespresso', '柏翠旗舰店'])
     format_table_data_val(prs, fdata, 28, 5, 1, 1, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '格米莱旗舰店', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 28, 5, 1, 2, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'Nespresso', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 28, 5, 1, 3, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'delonghi德龙旗舰店', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 28, 5, 1, 4, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '柏翠旗舰店', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 28, 5, 1, 5, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'barsetto电器旗舰店', '平台流量-汇总-汇总')
-    format_chart_data2(prs, fdata, 28, 6, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'barsetto电器旗舰店')
+    format_table_data_val(prs, fdata, 28, 5, 1, 2, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'delonghi德龙旗舰店', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 28, 5, 1, 3, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'barsetto电器旗舰店', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 28, 5, 1, 4, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'Nespresso', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 28, 5, 1, 5, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '柏翠旗舰店', '平台流量-汇总-汇总')
     format_chart_data2(prs, fdata, 28, 7, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', '格米莱旗舰店')
-    format_chart_data2(prs, fdata, 28, 8, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', '柏翠旗舰店')
-    format_chart_data2(prs, fdata, 28, 9, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'delonghi德龙旗舰店')
-    format_chart_data2(prs, fdata, 28, 10, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'Nespresso')
+    format_chart_data2(prs, fdata, 28, 10, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'delonghi德龙旗舰店')
+    format_chart_data2(prs, fdata, 28, 9, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'barsetto电器旗舰店')
+    format_chart_data2(prs, fdata, 28, 8, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', 'Nespresso')
+    format_chart_data2(prs, fdata, 28, 6, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '咖啡机', '柏翠旗舰店')
     format_table_data_ct_chl(prs, fdata, 28, 11, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', '格米莱旗舰店')
-    format_table_data_ct_chl(prs, fdata, 28, 13, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'Nespresso')
-    format_table_data_ct_chl(prs, fdata, 28, 15, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'delonghi德龙旗舰店')
-    format_table_data_ct_chl(prs, fdata, 28, 17, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', '柏翠旗舰店')
-    format_table_data_ct_chl(prs, fdata, 28, 19, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'barsetto电器旗舰店')
+    format_table_data_ct_chl(prs, fdata, 28, 13, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'delonghi德龙旗舰店')
+    format_table_data_ct_chl(prs, fdata, 28, 15, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'barsetto电器旗舰店')
+    format_table_data_ct_chl(prs, fdata, 28, 17, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', 'Nespresso')
+    format_table_data_ct_chl(prs, fdata, 28, 19, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '咖啡机', '柏翠旗舰店')
     format_table_data_val(prs, fdata, 28, 21, 1, 1, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', '格米莱旗舰店')
-    format_table_data_val(prs, fdata, 28, 21, 1, 2, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'Nespresso')
-    format_table_data_val(prs, fdata, 28, 21, 1, 3, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'delonghi德龙旗舰店')
-    format_table_data_val(prs, fdata, 28, 21, 1, 4, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', '柏翠旗舰店')
-    format_table_data_val(prs, fdata, 28, 21, 1, 5, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'barsetto电器旗舰店')
+    format_table_data_val(prs, fdata, 28, 21, 1, 2, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'delonghi德龙旗舰店')
+    format_table_data_val(prs, fdata, 28, 21, 1, 3, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'barsetto电器旗舰店')
+    format_table_data_val(prs, fdata, 28, 21, 1, 4, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', 'Nespresso')
+    format_table_data_val(prs, fdata, 28, 21, 1, 5, 'dat_nespresso_compet', 'uv_本月', 1, '咖啡机', '柏翠旗舰店')
     format_remark_text(prs, 28, 2, '生意参谋-品类360')
 
-    format_table_data_ct_chl_ad(prs, fdata, 29, 3, 'dat_nespresso_compet_chl', ['二级', '三级'], ['uv占比_一级', '支付转化率'], '广告流量', '咖啡机', ['格米莱旗舰店', 'Nespresso', 'delonghi德龙旗舰店', '柏翠旗舰店', 'barsetto电器旗舰店'])
+    format_table_data_ct_chl_ad(prs, fdata, 29, 3, 'dat_nespresso_compet_chl', ['二级', '三级'], ['uv占比_一级', '支付转化率'], '广告流量', '咖啡机', ['格米莱旗舰店', 'delonghi德龙旗舰店', 'barsetto电器旗舰店', 'Nespresso', '柏翠旗舰店'])
     format_table_data_val(prs, fdata, 29, 3, 3, 2, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '格米莱旗舰店', '广告流量-汇总-汇总')
     format_table_data_val(prs, fdata, 29, 3, 3, 3, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', '格米莱旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 4, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'Nespresso', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 5, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'Nespresso', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 6, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'delonghi德龙旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 7, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'delonghi德龙旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 8, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '柏翠旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 9, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', '柏翠旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 10, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'barsetto电器旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 29, 3, 3, 11, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'barsetto电器旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 4, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'delonghi德龙旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 5, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'delonghi德龙旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 6, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'barsetto电器旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 7, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'barsetto电器旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 8, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', 'Nespresso', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 9, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', 'Nespresso', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 10, 'dat_nespresso_compet_chl', 'uv', 1, '咖啡机', '柏翠旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 29, 3, 3, 11, 'dat_nespresso_compet_chl', '支付转化率', 1, '咖啡机', '柏翠旗舰店', '广告流量-汇总-汇总')
     format_remark_text(prs, 29, 2, '生意参谋-竞店分析；分析维度：咖啡机类目流量')
 
     format_chart_data_wb(prs, fdata, 30, 3, '咖啡机表现', 'F:G', 436, 11)
@@ -1133,7 +1171,7 @@ def rps_format(prs, fdata):
     format_arrow(prs, 34, 29, 34, 30)
     format_arrow(prs, 34, 32, 34, 33)
     format_arrow(prs, 34, 35, 34, 38)
-    format_remark_text(prs, 34, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
+    format_remark_text(prs, 34, 2, '策略中心；渠道：全渠道；(由于生意参谋平台限制，大盘数据无法转化为真实值，改用策略中心（大盘同比值均为真实值）数据)', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
     format_text_data(prs, fdata, 35, 5, 'dat_nespresso_mkt_index', '销售金额_速溶咖啡', 1, '咖啡')
     format_text_data(prs, fdata, 35, 9, 'dat_nespresso_mkt_index', '销售金额_咖啡豆', 1, '咖啡')
@@ -1161,7 +1199,7 @@ def rps_format(prs, fdata):
     format_arrow(prs, 35, 29, 35, 30)
     format_arrow(prs, 35, 32, 35, 33)
 
-    format_remark_text(prs, 35, 3, '生意参谋')
+    format_remark_text(prs, 35, 3, '策略中心')
 
 
     format_chart_data9(prs, fdata, 37, 16, 'dat_nespresso_mkt_index', ['时间范围'], ['销售金额'], 14, '胶囊咖啡')
@@ -1190,20 +1228,22 @@ def rps_format(prs, fdata):
     format_arrow(prs, 37, 29, 37, 30)
     format_arrow(prs, 37, 32, 37, 33)
     format_arrow(prs, 37, 35, 37, 38)
-    format_remark_text(prs, 37, 2, '生意参谋；渠道：全渠道', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
+    format_remark_text(prs, 37, 2, '策略中心；渠道：全渠道； (由于生意参谋平台限制，大盘数据无法转化为真实值，改用策略中心（大盘同比值均为真实值）数据)', '平均价格(指数)：商品的平均成交价格(为准确洞察，不包含0.01元的订单数据)；人均购买量(指数)：消费者平均一次购买的商品件数（=销量(指数)/购买人数(指数)/购买频次）；购买频次：每个消费者平均购买次数')
 
     format_chart_data6(prs, fdata, 38, 7, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额'], ['交易金额_万'], 10, '胶囊咖啡')
-    format_chart_data3(prs, fdata, 38, 10, 'dat_nespresso_mkt_rk_brand', '销售金额', ['销售金额_Top1品牌_占比', '销售金额_Top2品牌_占比', '销售金额_Top3品牌_占比',  '销售金额_TOP4-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_Top品牌_其他商家_占比'], 1, '胶囊咖啡')
+    format_chart_data3(prs, fdata, 38, 10, 'dat_nespresso_mkt_share', '销售金额', ['销售金额_top1品牌_占比', '销售金额_top2nd品牌_占比',  '销售金额_TOP3-10品牌_占比', '销售金额_TOP11-20品牌_占比', '销售金额_top品牌_其他商家_占比'], 1, '胶囊咖啡')
     format_table_data_brand_mkt_share(prs, fdata, 38, 3, 'dat_nespresso_mkt_share', ['时间范围'], ['时间范围', '销售金额_top2品牌_占比', '销售金额_top10品牌_占比'], [1, 13], '胶囊咖啡')
     format_table_data_brand(prs, fdata, 38, 6, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['交易金额_同比', '品牌市占率', '品牌市占率_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 10, '胶囊咖啡')
     #format_table_data_brand_mkt(prs, fdata, 38, 6, 'dat_nespresso_mkt_overview', ['时间范围'], ['销售金额_同比', '购买人数', '购买人数_同比', '客单价', '客单价_同比', '访客人数', '访客人数_同比'], 1, '胶囊咖啡')
-    format_table_data_brand_rk(prs, fdata, 38, 13, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '胶囊咖啡')
+    format_table_data_brand_rk(prs, fdata, 38, 11, 'dat_nespresso_mkt_rk_brand', ['品牌名称'], ['排名_变化'], 10, '胶囊咖啡')
     format_text_data(prs, fdata, 38, 9, 'dat_nespresso_mkt_rk_brand', 'TTL*', 1, '胶囊咖啡')
     format_remark_text(prs, 38, 2, '生意参谋；渠道：全渠道','市场TTL：当月市场Top50品牌GMV加总；*市占率 = 品牌GMV/ 当月Top50品牌GMV加总')
 
-    format_chart_data_wb(prs, fdata, 39, 3, '咖啡市场情况', 'C:E', 103, 11)
-    format_table_data_wb(prs, fdata, 39, 4, '咖啡市场情况', [0, 1, 2, 5, 6, 7], 103, 11, 1, -1)
-    format_table_cell_color(prs, 39, 4, list(range(2, 12)), list(range(1, 4)), '品牌分销')
+    format_chart_data_wb(prs, fdata, 39, 4, '咖啡市场情况', 'C:E', 103, 11)
+    format_table_data_wb(prs, fdata, 39, 5, '咖啡市场情况', [0, 1, 2, 5, 6, 7], 103, 11, 1, -1)
+    format_table_data_sub(prs, fdata, 39, 0, '咖啡市场情况', 'C:E', 103, 11)
+    format_table_cell_color(prs, 39, 5, list(range(2, 12)), list(range(1, 4)), '品牌分销')
+    format_table_cell_color(prs, 39, 5, list(range(2, 12)), list(range(1, 4)), '品牌分销背景')
     format_remark_text(prs, 39, 2, '生意参谋')
 
     format_chart_data(prs, fdata, 40, 6, 'dat_nespresso_shop_ct_each', ['时间范围'], ['支付金额'], 13, '胶囊咖啡')
@@ -1243,7 +1283,7 @@ def rps_format(prs, fdata):
     format_chart_title(prs, 43, 3, '胶囊咖啡新老客购买人群画像')
     format_chart_data(prs, fdata, 43, 3, 'dat_nespresso_profile_d', ['标签', '标签值'],
                       ['店铺购买人群', '店铺品牌新客', '店铺品牌老客'], 19, '胶囊咖啡')
-    format_remark_text(prs, 43, 2, '策略中心', '店铺胶囊咖啡品牌新客-当月购买店铺胶囊咖啡差前365天购买品牌产品；\n店铺胶囊咖啡品牌老客-当月购买店铺胶囊咖啡交前365天购买品牌产品')
+    format_remark_text(prs, 43, 2, '达摩盘', '店铺胶囊咖啡品牌新客-当月购买店铺胶囊咖啡差前365天购买品牌产品；\n店铺胶囊咖啡品牌老客-当月购买店铺胶囊咖啡交前365天购买品牌产品')
 
     format_chart_data_wb(prs, fdata, 44, 3, '咖啡市场情况', 'B:C', 223, 11)
     format_table_data_wb(prs, fdata, 44, 4, '咖啡市场情况', 'A:F', 223, 11, 1, 0)
@@ -1254,23 +1294,24 @@ def rps_format(prs, fdata):
     format_remark_text(prs, 45, 2, '策略中心', '本品/竞品购买率：在近90天同时浏览本品&竞品胶囊咖啡类目后在近90天有该类目购买行为的人群在同时浏览人群中的占比')
 
     format_chart_data_wb(prs, fdata, 46, 8, '咖啡市场情况', 'C:E', 284, 10)
-    format_chart_data_wb(prs, fdata, 46, 11, '咖啡市场情况', 'L:O', 248, 4)
-    format_chart_data_wb(prs, fdata, 46, 10, '咖啡市场情况', 'Q:T', 259, 3)
-    format_arrow_wb(prs, fdata, 46, 12, '咖啡市场情况', 'E:F', 284, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 13, '咖啡市场情况', 'E:F', 285, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 14, '咖啡市场情况', 'E:F', 286, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 15, '咖啡市场情况', 'E:F', 287, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 16, '咖啡市场情况', 'E:F', 288, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 17, '咖啡市场情况', 'E:F', 289, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 18, '咖啡市场情况', 'E:F', 290, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 19, '咖啡市场情况', 'E:F', 291, 2, 1)
-    format_arrow_wb(prs, fdata, 46, 20, '咖啡市场情况', 'E:F', 292, 2, 1)
-    format_remark_text(prs, 46, 7, '策略中心&达摩盘', '胶囊咖啡品牌复购率定义：22.09-23.08购买该品牌胶囊咖啡类目老客 交 23.09购买该品牌胶囊咖啡类目老客，数据来源：策略中心\n店铺胶囊咖啡老客流向： 22.09-23.08购买Nespresso胶囊咖啡类目老客在23.09月购买市场胶囊咖啡品牌流向，数据来源：达摩盘\n老客：前365天发生过店铺胶囊咖啡/市场胶囊咖啡购买行为')
+    format_chart_data_wb(prs, fdata, 46, 10, '咖啡市场情况', 'L:O', 248, 4)
+    format_chart_data_wb(prs, fdata, 46, 9, '咖啡市场情况', 'Q:T', 259, 3)
+    format_arrow_wb(prs, fdata, 46, 11, '咖啡市场情况', 'E:F', 284, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 12, '咖啡市场情况', 'E:F', 285, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 13, '咖啡市场情况', 'E:F', 286, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 14, '咖啡市场情况', 'E:F', 287, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 15, '咖啡市场情况', 'E:F', 288, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 16, '咖啡市场情况', 'E:F', 289, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 17, '咖啡市场情况', 'E:F', 290, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 18, '咖啡市场情况', 'E:F', 291, 2, 1)
+    format_arrow_wb(prs, fdata, 46, 19, '咖啡市场情况', 'E:F', 292, 2, 1)
+    dt_now,dt_xinke,dt_last_xinke=get_dt_xinlaoke()
+    format_remark_text(prs, 46, 7, '策略中心&达摩盘', '胶囊咖啡品牌复购率定义：{2}-{1}购买该品牌胶囊咖啡类目老客 交 {0}购买该品牌胶囊咖啡类目老客，数据来源：策略中心\n店铺胶囊咖啡老客流向： {2}-{1}购买Nespresso胶囊咖啡类目老客在{0}月购买市场胶囊咖啡品牌流向，数据来源：达摩盘\n老客：前365天发生过店铺胶囊咖啡/市场胶囊咖啡购买行为'.format(dt_now,dt_xinke,dt_last_xinke))
 
     format_table_data_wb(prs, fdata, 48, 5, '咖啡市场情况', 'G:I', 302, 11, 1, 0)
     format_table_data_wb(prs, fdata, 48, 6, '咖啡市场情况', 'A:C', 302, 11, 1, 0)
-    format_table_title(prs, 48, 5, 0, 0, get_dt_year_month_last(), ' 胶囊咖啡TOP10单品')
-    format_table_title(prs, 48, 6, 0, 0, get_dt_year_month(), ' 胶囊咖啡TOP10单品')
+    format_table_title(prs, 48, 5, 0, 0, get_dt_year_month_last(), '')
+    format_table_title(prs, 48, 6, 0, 0, get_dt_year_month(), '')
     format_text_data_wb(prs, fdata, 48, 3, '咖啡市场情况', 'I:J', 312, 2, 'Nespresso GMV占比')
     format_text_data_wb(prs, fdata, 48, 4, '咖啡市场情况', 'C:D', 312, 2, 'Nespresso GMV占比')
     format_remark_text(prs, 48, 2, '策略中心；渠道：全渠道')
@@ -1297,44 +1338,44 @@ def rps_format(prs, fdata):
     format_table_data_chl(prs, fdata, 52, 4, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '平台流量', '胶囊咖啡')
     format_remark_text(prs, 52, 2, '生意参谋', '生意参谋暂不支持查看逛逛渠道的后链路转化表现')
 
-    format_chart_data_chl(prs, fdata, 53, 3, 'dat_nespresso_compet_chl', ['店铺'], ['uv占比'], ['广告流量', '平台流量'], '胶囊咖啡', ['隅田川旗舰店', 'Nespresso', 'PEET’S官方旗舰店', 'Dolce Gusto官方旗舰店',     '星巴克家享咖啡旗舰店'])
-    format_chart_data2(prs, fdata, 53, 6, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', '星巴克家享咖啡旗舰店')
+    format_chart_data_chl(prs, fdata, 53, 3, 'dat_nespresso_compet_chl', ['店铺'], ['uv占比'], ['广告流量', '平台流量'], '胶囊咖啡', ['隅田川旗舰店', 'Dolce Gusto官方旗舰店', 'Nespresso', 'PEET’S官方旗舰店','星巴克家享咖啡旗舰店'])
     format_chart_data2(prs, fdata, 53, 7, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', '隅田川旗舰店')
     format_chart_data2(prs, fdata, 53, 8, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', 'Dolce Gusto官方旗舰店')
-    format_chart_data2(prs, fdata, 53, 9, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', 'PEET’S官方旗舰店')
     format_chart_data2(prs, fdata, 53, 10, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', 'Nespresso')
+    format_chart_data2(prs, fdata, 53, 9, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', 'PEET’S官方旗舰店')
+    format_chart_data2(prs, fdata, 53, 6, 'dat_nespresso_compet_chl', ['二级'], ['uv占比_一级'], '平台流量', '胶囊咖啡', '星巴克家享咖啡旗舰店')
     format_table_data_ct_chl(prs, fdata, 53, 11, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', '隅田川旗舰店')
-    format_table_data_ct_chl(prs, fdata, 53, 13, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'Nespresso')
-    format_table_data_ct_chl(prs, fdata, 53, 15, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'PEET’S官方旗舰店')
-    format_table_data_ct_chl(prs, fdata, 53, 17, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'Dolce Gusto官方旗舰店')
+    format_table_data_ct_chl(prs, fdata, 53, 13, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'Dolce Gusto官方旗舰店')
+    format_table_data_ct_chl(prs, fdata, 53, 15, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'Nespresso')
+    format_table_data_ct_chl(prs, fdata, 53, 17, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', 'PEET’S官方旗舰店')
     format_table_data_ct_chl(prs, fdata, 53, 19, 'dat_nespresso_compet_chl', ['二级'], ['支付转化率'], '平台流量', '胶囊咖啡', '星巴克家享咖啡旗舰店')
     format_table_data_val(prs, fdata, 53, 5, 1, 1, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', '隅田川旗舰店', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 53, 5, 1, 2, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Nespresso', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 53, 5, 1, 3, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '平台流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 53, 5, 1, 4, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 53, 5, 1, 2, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 53, 5, 1, 3, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Nespresso', '平台流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 53, 5, 1, 4, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '平台流量-汇总-汇总')
     format_table_data_val(prs, fdata, 53, 5, 1, 5, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', '星巴克家享咖啡旗舰店', '平台流量-汇总-汇总')
     format_table_data_val(prs, fdata, 53, 21, 1, 1, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', '隅田川旗舰店')
-    format_table_data_val(prs, fdata, 53, 21, 1, 2, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'Nespresso')
-    format_table_data_val(prs, fdata, 53, 21, 1, 3, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'PEET’S官方旗舰店')
-    format_table_data_val(prs, fdata, 53, 21, 1, 4, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店')
+    format_table_data_val(prs, fdata, 53, 21, 1, 2, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店')
+    format_table_data_val(prs, fdata, 53, 21, 1, 3, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'Nespresso')
+    format_table_data_val(prs, fdata, 53, 21, 1, 4, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', 'PEET’S官方旗舰店')
     format_table_data_val(prs, fdata, 53, 21, 1, 5, 'dat_nespresso_compet', 'uv_本月', 1, '胶囊咖啡', '星巴克家享咖啡旗舰店')
     format_remark_text(prs, 53, 2, '生意参谋-品类360')
 
-    format_table_data_ct_chl_ad(prs, fdata, 54, 3, 'dat_nespresso_compet_chl', ['二级', '三级'], ['uv占比_一级', '支付转化率'], '广告流量', '胶囊咖啡', ['隅田川旗舰店', 'Nespresso', 'PEET’S官方旗舰店', 'Dolce Gusto官方旗舰店', '星巴克家享咖啡旗舰店'])
+    format_table_data_ct_chl_ad(prs, fdata, 54, 3, 'dat_nespresso_compet_chl', ['二级', '三级'], ['uv占比_一级', '支付转化率'], '广告流量', '胶囊咖啡', ['隅田川旗舰店', 'Dolce Gusto官方旗舰店', 'Nespresso', 'PEET’S官方旗舰店','星巴克家享咖啡旗舰店'])
     format_table_data_val(prs, fdata, 54, 3, 3, 2, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', '隅田川旗舰店', '广告流量-汇总-汇总')
     format_table_data_val(prs, fdata, 54, 3, 3, 3, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', '隅田川旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 4, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Nespresso', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 5, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'Nespresso', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 6, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 7, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 8, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '广告流量-汇总-汇总')
-    format_table_data_val(prs, fdata, 54, 3, 3, 9, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 4, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 5, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'Dolce Gusto官方旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 6, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'Nespresso', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 7, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'Nespresso', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 8, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '广告流量-汇总-汇总')
+    format_table_data_val(prs, fdata, 54, 3, 3, 9, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', 'PEET’S官方旗舰店', '广告流量-汇总-汇总')
     format_table_data_val(prs, fdata, 54, 3, 3, 10, 'dat_nespresso_compet_chl', 'uv', 1, '胶囊咖啡', '星巴克家享咖啡旗舰店', '广告流量-汇总-汇总')
     format_table_data_val(prs, fdata, 54, 3, 3, 11, 'dat_nespresso_compet_chl', '支付转化率', 1, '胶囊咖啡', '星巴克家享咖啡旗舰店', '广告流量-汇总-汇总')
     format_remark_text(prs, 54, 2, '生意参谋-竞店分析；分析维度：胶囊咖啡类目流量')
 
     format_chart_data_wb(prs, fdata, 55, 3, '咖啡市场情况', 'F:G', 430, 11)
-    format_chart_data_wb(prs, fdata, 55, 6, '咖啡市场情况', 'B:D', 430, 11)
+    format_chart_data_wb(prs, fdata, 55, 5, '咖啡市场情况', 'B:D', 430, 11)
     format_table_data_wb(prs, fdata, 55, 4, '咖啡市场情况', 'G:J', 430, 11, 1, -1)
     format_remark_text(prs, 55, 2, '生意参谋')
 
