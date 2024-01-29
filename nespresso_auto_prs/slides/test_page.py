@@ -14,10 +14,10 @@ def test_page(prs_data_load, prs_load, test_output):
     fdata = prs_data_load
     prs = Presentation(prs_load)
 
-    format_chart_data_sort(prs, fdata, 26, 4, 'dat_nespresso_shop_ct_chl', ['二级', '三级'], ['访客数_同比月', '访客数_本月', '支付转化率_同比月', '支付转化率_本月'], '广告流量', '咖啡机')
-    col_no_pay=format_table_data_chl_sort(prs, fdata, 26, 3, 'dat_nespresso_shop_ct_chl', ['chl'], ['支付人数_同比', '访客数_同比', '支付转化率_同比'], '广告流量', '咖啡机')
-    format_remark_text(prs, 26, 2, '生意参谋',  '生意参谋暂不支持查看{}渠道的后链路转化表现'.format('、'.join(col_no_pay)))
-
+    format_chart_data_wb(prs, fdata, 55, 3, '咖啡市场情况', 'F:G', 430, 11)
+    format_chart_data_wb(prs, fdata, 55, 5, '咖啡市场情况', 'B:D', 430, 11)
+    format_table_data_wb(prs, fdata, 55, 4, '咖啡市场情况', 'G:J', 430, 11, 1, -1)
+    format_remark_text(prs, 55, 2, '生意参谋')
     prs.save(test_output)
 
 if __name__ == '__main__':
